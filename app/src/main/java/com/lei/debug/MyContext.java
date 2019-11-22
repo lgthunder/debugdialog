@@ -35,32 +35,17 @@ public class MyContext implements IContext {
 
                 @Override
                 public void setItems(String[] items, final DialogFactory.Function<DialogFactory.Dialog, Integer> function) {
-                    listDialog.setItems(items, new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialogInterface, int i) {
-                            function.apply(null, i);
-                        }
-                    });
+                    listDialog.setItems(items, (dialogInterface, i) -> function.apply(null, i));
                 }
 
                 @Override
                 public void setOnCancelListener(final DialogFactory.Function1<DialogFactory.Dialog> o) {
-                    listDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
-                        @Override
-                        public void onCancel(DialogInterface dialogInterface) {
-                            o.apply(null);
-                        }
-                    });
+                    listDialog.setOnCancelListener(dialogInterface -> o.apply(null));
                 }
 
                 @Override
                 public void setOnDismissListener(final DialogFactory.Function1<DialogFactory.Dialog> o) {
-                    listDialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
-                        @Override
-                        public void onDismiss(DialogInterface dialogInterface) {
-                            o.apply(null);
-                        }
-                    });
+                    listDialog.setOnDismissListener(dialogInterface -> o.apply(null));
                 }
             };
         };

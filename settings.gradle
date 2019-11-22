@@ -1,2 +1,4 @@
-include ':app', ':debug-core'
+include ':app',
+//        ':debug-core',
+        ':core'
 //rootProject.name='demo'
