@@ -1,2 +1,2 @@
 include ':app', ':debug-core'
-rootProject.name='demo'
+//rootProject.name='demo'
