@@ -1,8 +1,15 @@
 package com.lei.core;
 
+import android.content.Context;
+
 import com.lei.core.annotation.DebugClass;
 import com.lei.core.annotation.DebugField;
 import com.lei.core.annotation.DebugMethod;
+import com.lei.core.event.EventProvider;
+import com.lei.core.event.SensorEventProvider;
+import com.lei.core.page.Component;
+import com.lei.core.ui.DialogFactory;
+import com.lei.core.ui.SimpleListDialogFactory;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -16,32 +23,18 @@ import java.util.concurrent.TimeUnit;
 
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Consumer;
-import io.reactivex.subjects.BehaviorSubject;
 
-public class SensorManagerHelper implements SensorEventListener {
-    // 速度阈值，当摇晃速度达到这值后产生作用
-    private final int SPEED_SHRESHOLD = 5000;
-    // 两次检测的时间间隔
-    private final int UPTATE_INTERVAL_TIME = 50;
-    // 传感器管理器
+public class DebugCore {
 
-    // 上下文对象context
-    // 手机上一个位置时重力感应坐标
-    private float lastX;
-    private float lastY;
-    private float lastZ;
-    // 上次检测时间
-    private long lastUpdateTime;
     private List<Class> ignoreList = new ArrayList<>();
 
     private Disposable mDisposable;
-    BehaviorSubject<String> subject;
     private boolean isDialogShow = false;
     private DialogFactory mDialogFactory;
-    private IContext mContext;
+    private Component mContext;
 
-    private SensorEventProvider mSensorEventProvider;
-    private static SensorManagerHelper mHelper;
+    private EventProvider mEventProvider;
+    private static DebugCore mHelper;
 
     private Map<String, Action> callBackHandler = new HashMap<>();
 
@@ -55,11 +48,9 @@ public class SensorManagerHelper implements SensorEventListener {
     }
 
 
-    private SensorManagerHelper() {
-        registerDebugList.add(new TaskRegisterDebug());
-        registerDebugList.add(new FeetRecordRegisterDebug());
+    private DebugCore() {
+        mHelper = this;
 //        ignoreList.add(MainActivity.class);
-        initRegister();
     }
 
     private void initRegister() {
@@ -73,14 +64,11 @@ public class SensorManagerHelper implements SensorEventListener {
     }
 
 
-    public void addHandler(String name, Runnable runnable) {
-        _addHandler(name, runnable);
+    public static void addHandler(String name, Runnable runnable) {
+        mHelper._addHandler(name, runnable);
     }
 
     public static void removeHanlder(String name) {
-        if (mHelper == null) {
-            mHelper = new SensorManagerHelper();
-        }
         mHelper._removeHandler(name);
     }
 
@@ -148,7 +136,7 @@ public class SensorManagerHelper implements SensorEventListener {
 //        final String[] items = concat(keySet.toArray(new String[keySet.size()]), tempKeySet.toArray(new String[tempKeySet.size()]));
 
         final String[] items = listContent.keySet().toArray(new String[listContent.size()]);
-        DialogFactory.Dialog listDialog = mDialogFactory.createDialog();
+        DialogFactory.Dialog listDialog = mDialogFactory.createDialog((Context) page);
         listDialog.setTitle("DEBUG包测试弹窗");
         listDialog.setItems(items, (dialog, which) -> {
             String key = items[which];
@@ -242,28 +230,18 @@ public class SensorManagerHelper implements SensorEventListener {
     public void start() {
         if (mDisposable != null)
             mDisposable.dispose();
-        subject = BehaviorSubject.create();
-        // 获得传感器管理器
-        mSensorEventProvider.providerSensorEvent().subscribe(new Consumer<SensorEvent>() {
-            @Override
-            public void accept(SensorEvent sensorEvent) throws Exception {
-                onSensorChanged(sensorEvent);
-            }
-        });
-
-        mDisposable = subject.throttleFirst(500, TimeUnit.MILLISECONDS).subscribe((new Consumer() {
-            @Override
-            public void accept(Object o) throws Exception {
-                if (!BuildUtils.isDebug()) return;
-                showListDialog();
-            }
-        }), new Consumer<Throwable>() {
-            @Override
-            public void accept(Throwable throwable) throws Exception {
-                isDialogShow = false;
-                throwable.printStackTrace();
-            }
-        });
+        mDisposable = mEventProvider.providerSensorEvent()
+                .throttleFirst(500, TimeUnit.MILLISECONDS)
+                .subscribe((o -> {
+                    if (!BuildUtils.isDebug()) return;
+                    showListDialog();
+                }), new Consumer<Throwable>() {
+                    @Override
+                    public void accept(Throwable throwable) {
+                        isDialogShow = false;
+                        throwable.printStackTrace();
+                    }
+                });
     }
 
     /**
@@ -275,47 +253,12 @@ public class SensorManagerHelper implements SensorEventListener {
     }
 
 
-    /**
-     * 重力感应器感应获得变化数据
-     * android.hardware.SensorEventListener#onSensorChanged(android.hardware
-     * .SensorEvent)
-     */
-    @Override
-    public void onSensorChanged(SensorEvent event) {
-        // 现在检测时间
-        long currentUpdateTime = System.currentTimeMillis();
-        // 两次检测的时间间隔
-        long timeInterval = currentUpdateTime - lastUpdateTime;
-        // 判断是否达到了检测时间间隔
-        if (timeInterval < UPTATE_INTERVAL_TIME) return;
-        // 现在的时间变成last时间
-        lastUpdateTime = currentUpdateTime;
-        // 获得x,y,z坐标
-        float x = event.getX();
-        float y = event.getY();
-        float z = event.getZ();
-        // 获得x,y,z的变化值
-        float deltaX = x - lastX;
-        float deltaY = y - lastY;
-        float deltaZ = z - lastZ;
-        // 将现在的坐标变成last坐标
-        lastX = x;
-        lastY = y;
-        lastZ = z;
-        double speed = Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ
-                * deltaZ)
-                / timeInterval * 10000;
-        // 达到速度阀值，发出提示
-        if (speed >= SPEED_SHRESHOLD) {
-            subject.onNext("1");
-        }
-    }
-
     public static class Builder {
         private DialogFactory mDialogFactory;
-        private IContext mContext;
-
-        private SensorEventProvider mSensorEventProvider;
+        private Component mComponent;
+        private EventProvider mEventProvider;
+        private RegisterDebugProvider mIRegisterDebugs;
+        private IgnorePageProvider mIgnorePageProvider;
 
         public Builder() {
 
@@ -326,23 +269,42 @@ public class SensorManagerHelper implements SensorEventListener {
             return this;
         }
 
-        public Builder setContext(IContext context) {
-            mContext = context;
+        public Builder setComponent(Component context) {
+            mComponent = context;
             return this;
         }
 
-        public Builder setSensorEventProvider(SensorEventProvider sensorEventProvider) {
-            mSensorEventProvider = sensorEventProvider;
+        public Builder setEventProvider(EventProvider eventProvider) {
+            mEventProvider = eventProvider;
             return this;
         }
 
-        public SensorManagerHelper build() {
-            SensorManagerHelper helper = new SensorManagerHelper();
-            helper.mDialogFactory = mContext.getDialogFactory();
-            helper.mContext = mContext;
-            helper.mSensorEventProvider = mSensorEventProvider;
+        public Builder setIRegisterDebugs(RegisterDebugProvider provider) {
+            mIRegisterDebugs = provider;
+            return this;
+        }
+
+        public Builder setIgnoreList(IgnorePageProvider provider) {
+            this.mIgnorePageProvider = provider;
+            return this;
+        }
+
+        public DebugCore build() {
+            DebugCore helper = new DebugCore();
+            if (mComponent == null)
+                throw new RuntimeException("debug core : component cant be null");
+            helper.mContext = mComponent;
+            helper.mDialogFactory = mDialogFactory == null ? new SimpleListDialogFactory() : mDialogFactory;
+            helper.mEventProvider = mEventProvider == null ? new SensorEventProvider(mComponent.getApplication()) : mEventProvider;
+            if (mIgnorePageProvider != null)
+                helper.ignoreList = mIgnorePageProvider.providerIgnoreList() == null ? helper.ignoreList : mIgnorePageProvider.providerIgnoreList();
+            if (mIRegisterDebugs != null)
+                helper.registerDebugList = mIRegisterDebugs.getRegisterDebugs() == null ? helper.registerDebugList : mIRegisterDebugs.getRegisterDebugs();
+            helper.initRegister();
             return helper;
         }
+
+
     }
 
 

@@ -1,54 +1,24 @@
 package com.lei.debug;
 
-import android.app.Activity;
 import android.app.Application;
-import android.os.Bundle;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
+import com.lei.core.DebugCore;
+import com.lei.core.page.ComponentImp;
 
 public class MyApplication extends Application {
 
-    public static Object mObject =null;
+    public static MyApplication mObject = null;
 
     @Override
     public void onCreate() {
         super.onCreate();
-        registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
-            @Override
-            public void onActivityCreated(@NonNull Activity activity, @Nullable Bundle bundle) {
+        mObject = this;
+        new DebugCore.Builder()
+                .setComponent(new ComponentImp(MyApplication.mObject))
+                .setIRegisterDebugs(new RegisterDebugProviderImp())
+                .setIgnoreList(new IgnorePageProviderImp())
+                .build()
+                .init();
 
-            }
-
-            @Override
-            public void onActivityStarted(@NonNull Activity activity) {
-
-            }
-
-            @Override
-            public void onActivityResumed(@NonNull Activity activity) {
-                mObject=activity;
-            }
-
-            @Override
-            public void onActivityPaused(@NonNull Activity activity) {
-
-            }
-
-            @Override
-            public void onActivityStopped(@NonNull Activity activity) {
-                mObject=null;
-            }
-
-            @Override
-            public void onActivitySaveInstanceState(@NonNull Activity activity, @NonNull Bundle bundle) {
-
-            }
-
-            @Override
-            public void onActivityDestroyed(@NonNull Activity activity) {
-
-            }
-        });
     }
 }

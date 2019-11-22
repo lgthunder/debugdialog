@@ -1,8 +1,10 @@
-package com.lei.core;
+package com.lei.core.ui;
+
+import android.content.Context;
 
 public interface DialogFactory {
 
-    Dialog createDialog();
+    Dialog createDialog(Context context);
 
     interface Dialog {
         void show();
